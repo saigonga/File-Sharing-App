@@ -1,3 +1,6 @@
 # Ignore environment variables
 .env
-# ...existing code...
+
+# Firebase and other sensitive config files
+src/Firebase/firebase.js
+src/Firebase/auth.js
