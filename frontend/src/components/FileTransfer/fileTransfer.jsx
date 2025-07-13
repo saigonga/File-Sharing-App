@@ -176,6 +176,7 @@ function FileTransfer() {
                     ref={fileInputRef} 
                     className={styles["file-transfer-input"]}
                     onChange={sendFile}
+                    placeholder="Only File under 20mb is allowed"
                 />
                 <button className={styles["file-transfer-btn"]} onClick={sendFile}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
