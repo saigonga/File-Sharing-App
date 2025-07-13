@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useSocket } from "../../context/socketContext";
+import { useAuth } from "../../context/authContext/authContext";
+import { validateFile, validateRoomId, sanitizeRoomId, checkUploadRateLimit } from "../../utils/security";
 import styles from "./fileTransfer.module.css";
 
 function FileTransfer() {
     const socket = useSocket();
+    const { currentUser } = useAuth();
     const fileInputRef = useRef(null);
     const [room, setRoom] = useState("");
     const [progress, setProgress] = useState("");
@@ -11,29 +14,65 @@ function FileTransfer() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [previousRooms, setPreviousRooms] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     const joinRoom = () => {
-        if (!room) {
-            setProgress("Please enter a room ID.");
+        const roomValidation = validateRoomId(room);
+        if (!roomValidation.isValid) {
+            setProgress(roomValidation.error);
             return;
         }
         if (!socket) {
             setProgress("Socket not connected.");
             return;
         }
-        socket.emit("join_room", room);
-        setProgress(`Joined room: ${room}`);
-        setPreviousRooms((prev) => prev.includes(room) ? prev : [room, ...prev]);
+        
+        const sanitizedRoom = sanitizeRoomId(room);
+        socket.emit("join_room", sanitizedRoom);
+        setProgress(`Joined room: ${sanitizedRoom}`);
+        setPreviousRooms((prev) => prev.includes(sanitizedRoom) ? prev : [sanitizedRoom, ...prev.slice(0, 4)]);
+        setRoom(sanitizedRoom);
     };
 
-    const sendFile = () => {
+    const sendFile = async () => {
+        if (isUploading) return;
+        
         setReceivedFile(null);
-        const file = fileInputRef.current.files[0];
-        if (!file || !room || !socket) {
-            setProgress("Please select a file and enter a room ID.");
+        const file = fileInputRef.current?.files[0];
+        
+        if (!file) {
+            setProgress("Please select a file.");
             return;
         }
-        setProgress("Reading file...");
+
+        if (!room) {
+            setProgress("Please join a room first.");
+            return;
+        }
+
+        if (!socket) {
+            setProgress("Socket not connected.");
+            return;
+        }
+
+        // Validate file
+        const fileValidation = validateFile(file);
+        if (!fileValidation.isValid) {
+            setProgress(`File validation failed: ${fileValidation.errors.join(', ')}`);
+            return;
+        }
+
+        // Check rate limiting
+        const userId = currentUser?.uid || 'anonymous';
+        const rateLimitCheck = checkUploadRateLimit(userId);
+        if (!rateLimitCheck.allowed) {
+            setProgress(rateLimitCheck.error);
+            return;
+        }
+
+        setIsUploading(true);
+        setProgress(`Reading file: ${fileValidation.fileInfo.sizeFormatted}...`);
+        
         const reader = new FileReader();
         reader.onprogress = (e) => {
             if (e.lengthComputable) {
@@ -41,25 +80,34 @@ function FileTransfer() {
                 setUploadProgress(percent);
             }
         };
+        
         reader.onload = (e) => {
             setUploadProgress(100);
             setProgress("Sending file...");
+            
             socket.emit("send_file", {
-                fileName: file.name,
+                fileName: fileValidation.fileInfo.name,
                 fileType: file.type,
+                fileSize: file.size,
                 fileBuffer: e.target.result,
                 toRoom: room,
+                sender: userId
             });
-            setProgress("File sent!");
+            
+            setProgress("File sent successfully!");
             setTimeout(() => {
                 setUploadProgress(0);
                 setProgress("");
+                setIsUploading(false);
                 if (fileInputRef.current) fileInputRef.current.value = "";
-            }, 1200);
+            }, 1500);
         };
+        
         reader.onerror = () => {
             setProgress("Error reading file.");
+            setIsUploading(false);
         };
+        
         setUploadProgress(0);
         reader.readAsArrayBuffer(file);
     };
@@ -91,7 +139,8 @@ function FileTransfer() {
         const file = e.dataTransfer.files[0];
         if (file) {
             fileInputRef.current.files = e.dataTransfer.files;
-            sendFile();
+            // Don't automatically send - just update the file input
+            setProgress(`File selected: ${file.name}`);
         }
     };
 
@@ -175,15 +224,18 @@ function FileTransfer() {
                     type="file" 
                     ref={fileInputRef} 
                     className={styles["file-transfer-input"]}
-                    onChange={sendFile}
-                    placeholder="Only File under 20mb is allowed"
+                    placeholder="Only File under 10mb is allowed"
                 />
-                <button className={styles["file-transfer-btn"]} onClick={sendFile}>
+                <button 
+                    className={styles["file-transfer-btn"]} 
+                    onClick={sendFile}
+                    disabled={isUploading}
+                >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 4L12 16M12 16L8 12M12 16L16 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         <path d="M3 15V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Send File
+                    {isUploading ? "Sending..." : "Send File"}
                 </button>
             </div>
 
