@@ -49,7 +49,6 @@ export const validateFile = (file) => {
         errors.push('File name is too long');
     }
 
-    // Check for potentially dangerous file extensions
     const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.vbs', '.js', '.jar'];
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
     if (dangerousExtensions.includes(fileExtension)) {
@@ -88,7 +87,6 @@ export const sanitizeRoomId = (roomId) => {
 };
 
 export const sanitizeFileName = (fileName) => {
-    // Remove dangerous characters and limit length
     return fileName
         .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
         .replace(/\.\./g, '')
@@ -103,7 +101,6 @@ export const formatFileSize = (bytes) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Rate limiting for file uploads (client-side)
 const uploadAttempts = new Map();
 const MAX_UPLOADS_PER_MINUTE = 5;
 
@@ -121,7 +118,6 @@ export const checkUploadRateLimit = (userId) => {
         };
     }
 
-    // Add current attempt
     recentAttempts.push(now);
     uploadAttempts.set(userId, recentAttempts);
 
