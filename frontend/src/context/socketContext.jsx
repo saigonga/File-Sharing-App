@@ -10,7 +10,7 @@ const socketRef=useRef();
 const [isReady, setIsReady] = useState(false);
 
 useEffect(()=>{
-    socketRef.current=io("http://localhost:5001");
+    socketRef.current=io("https://file-sharing-app-backend-4gwm.onrender.com");
     socketRef.current.on("connect", () => setIsReady(true));
     return () =>{
         socketRef.current.disconnect();
