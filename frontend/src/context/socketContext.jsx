@@ -10,7 +10,8 @@ const socketRef=useRef();
 const [isReady, setIsReady] = useState(false);
 
 useEffect(()=>{
-    socketRef.current=io("https://file-sharing-app-backend-4gwm.onrender.com");
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
+    socketRef.current=io(backendUrl);
     socketRef.current.on("connect", () => setIsReady(true));
     return () =>{
         socketRef.current.disconnect();
